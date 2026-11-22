@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ShelfLock — ACID-Compliant Lending &amp; Automated Waitlist Desk</title>
+  <link rel="icon" type="image/png" href="/ShelfLock-Logo.png">
+  <link rel="stylesheet" href="/styles.css">
+
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="/ShelfLock_logo.png" alt="ShelfLock Logo" class="logo">
+      <div>
+        <h1>ShelfLock</h1>
+        <span class="subtitle">ACID-Compliant Lending &amp; Automated Waitlist Desk</span>
+      </div>
+    </div>
+    
+
+    <div class="topbar-controls">
+      <div class="member-picker">
+        <label for="who">Acting As</label>
+        <select id="who"></select>
+      </div>
+      <button class="icon-btn" id="theme-toggle" title="Toggle Dark/Light Theme" aria-label="Toggle theme">🌓</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Member & System KPI Strip -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <span class="kpi-label">Active Member</span>
+          <span id="member-badge" class="badge ok">Active</span>
+        </div>
+        <div class="kpi-value" id="kpi-member-name">Loading...</div>
+        <div class="kpi-meta" id="kpi-member-meta">—</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <span class="kpi-label">Borrow Quota</span>
+          <span class="kpi-label" id="kpi-quota-pct">0%</span>
+        </div>
+        <div class="kpi-value" id="kpi-quota">0 / 5</div>
+        <div class="progress-track"><div class="progress-fill" id="kpi-bar"></div></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <span class="kpi-label">Catalogue In View</span>
+          <span class="badge neutral" id="kpi-avail-copies">0 free</span>
+        </div>
+        <div class="kpi-value" id="kpi-books">0 Titles</div>
+        <div class="kpi-meta">Click any book to inspect physical barcodes</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <span class="kpi-label">Backend &amp; MySQL Pool</span>
+          <span class="status-pill"><span class="dot" id="srv-dot"></span><span id="srv-status">Checking</span></span>
+        </div>
+        <div class="kpi-value" id="kpi-db-books">—</div>
+        <div class="kpi-meta"><code>mysql2</code> pool (limit: 60) • Port 3000</div>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs" role="tablist">
+      <button id="t-books" class="tab-btn active" role="tab">
+        📚 Books Catalogue <span class="count-pill" id="c-books">0</span>
+      </button>
+      <button id="t-loans" class="tab-btn" role="tab">
+        📖 My Active Loans <span class="count-pill" id="c-loans">0</span>
+      </button>
+      <button id="t-queue" class="tab-btn" role="tab">
+        ⏳ Reservation Queue <span class="count-pill" id="c-queue">0</span>
+      </button>
+      <button id="t-logs" class="tab-btn" role="tab">
+        📡 Live API Monitor <span class="count-pill" id="c-logs">0</span>
+      </button>
+    </nav>
+
+    <!-- Tab 1: Books Catalogue -->
+    <section id="p-books" class="panel">
+      <div class="toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input id="q" type="search" placeholder="Search by title or author..." aria-label="Search books">
+        </div>
+
+        <label class="toggle-check">
+          <input type="checkbox" id="only-free">
+          <span>Available copies only</span>
+        </label>
+
+        <div class="view-switch">
+          <button class="btn small active" id="view-table">Table</button>
+          <button class="btn small" id="view-grid">Cards</button>
+        </div>
+
+        <button class="btn small" id="clear-filters">Reset</button>
+      </div>
+
+      <div class="chip-bar" id="subject-chips"></div>
+
+      <!-- Table Layout -->
+      <div class="surface" id="books-table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Title &amp; Author</th>
+                <th>Subject</th>
+                <th>Physical Copies</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="books-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Card Grid Layout -->
+      <div class="book-grid" id="books-grid" hidden></div>
+    </section>
+
+    <!-- Tab 2: My Active Loans -->
+    <section id="p-loans" class="panel" hidden>
+      <div class="surface">
+        <div class="panel-header">
+          <div>
+            <h2 id="loans-h">Open Loans</h2>
+            <p class="muted">14-day lending window • Returning a reserved book auto-assigns it to Queue #1</p>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Book Title</th>
+                <th>Physical Barcode</th>
+                <th>Issue Date</th>
+                <th>Due Date</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="loans-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: Reservation Queue -->
+    <section id="p-queue" class="panel" hidden>
+      <div class="surface">
+        <div class="panel-header">
+          <div>
+            <h2 id="queue-h">Reservation Queue</h2>
+            <p class="muted">FIFO waitlist ordered by timestamp • 48-hour pickup hold once returned</p>
+          </div>
+          <button class="btn warn" id="btn-expire">Sweep Expired 48h Holds</button>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Position</th>
+                <th>Member</th>
+                <th>Reserved Timestamp</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="queue-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 4: Live API & Concurrency Monitor -->
+    <section id="p-logs" class="panel" hidden>
+      <div class="surface">
+        <div class="panel-header">
+          <div>
+            <h2>Live REST API &amp; Transaction Log</h2>
+            <p class="muted">Real-time HTTP status codes, ACID outcomes, and response latencies</p>
+          </div>
+          <button class="btn small" id="clear-logs">Clear Log</button>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Endpoint</th>
+                <th>Status</th>
+                <th>Latency</th>
+                <th>Response Payload</th>
+              </tr>
+            </thead>
+            <tbody id="logs-tbody">
+              <tr><td colspan="5" class="empty">Interact with the app to see live API transactions here.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Physical Copy Inspector & Concurrency Burst Modal -->
+  <div class="modal-backdrop" id="modal-bg" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="m-title">
+      <div class="modal-header">
+        <div>
+          <h3 id="m-title">Book Copies</h3>
+          <p class="muted" id="m-meta"></p>
+        </div>
+        <button class="btn small" id="m-close">✕</button>
+      </div>
+
+      <div class="section-label">Individual Physical Copies (<code>book_copies</code> table)</div>
+      <div class="copies-grid" id="m-copies"></div>
+
+      <div class="burst-panel">
+        <div class="burst-top">
+          <div>
+            <strong>⚡ Live Concurrency Race Simulator</strong>
+            <p class="muted">Fires simultaneous <code>Promise.all</code> issue requests to test <code>FOR UPDATE SKIP LOCKED</code></p>
+          </div>
+          <div class="burst-controls">
+            <select id="burst-count" aria-label="Concurrent requests">
+              <option value="5">5 Concurrent</option>
+              <option value="10" selected>10 Concurrent</option>
+              <option value="20">20 Concurrent</option>
+            </select>
+            <button class="btn primary" id="m-race">Fire Burst</button>
+          </div>
+        </div>
+        <div class="burst-output" id="m-race-out" hidden></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-stack" aria-live="polite"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
+
